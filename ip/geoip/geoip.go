@@ -2,11 +2,11 @@ package geoip
 
 import (
 	"errors"
+	"github.com/sujit-baniya/frame"
+	"github.com/sujit-baniya/pkg/str"
 	"net"
 	"regexp"
 	"strings"
-
-	"github.com/gofiber/fiber/v2"
 )
 
 var cidrs []*net.IPNet
@@ -62,32 +62,23 @@ func isPrivateAddress(address string) (bool, error) {
 }
 
 // FromRequest determine user ip
-func FromRequest(c *fiber.Ctx) string {
+func FromRequest(c *frame.Context) string {
 	var headerValue []byte
-	if c.App().Config().ProxyHeader != "" && c.App().Config().ProxyHeader != "*" {
-		headerValue = []byte(c.IP())
-		if len(headerValue) <= 3 {
-			headerValue = []byte("0.0.0.0")
-		}
-		return string(fetchIPFromString.Find(headerValue))
-	}
-	if c.App().Config().ProxyHeader == "*" {
-		for _, headerName := range possibleHeaders {
-			headerValue = c.Request().Header.Peek(headerName)
-			if len(headerValue) > 3 {
-				// Check list of IP in X-Forwarded-For and return the first global address
-				for _, address := range strings.Split(string(headerValue), ",") {
-					address = strings.TrimSpace(address)
-					isPrivate, err := isPrivateAddress(address)
-					if !isPrivate && err == nil {
-						return string(fetchIPFromString.Find([]byte(address)))
-					}
+	for _, headerName := range possibleHeaders {
+		headerValue = c.GetHeader(headerName)
+		if len(headerValue) > 3 {
+			// Check list of IP in X-Forwarded-For and return the first global address
+			for _, address := range strings.Split(string(headerValue), ",") {
+				address = strings.TrimSpace(address)
+				isPrivate, err := isPrivateAddress(address)
+				if !isPrivate && err == nil {
+					return string(fetchIPFromString.Find([]byte(address)))
 				}
-				return string(fetchIPFromString.Find(headerValue))
 			}
+			return string(fetchIPFromString.Find(headerValue))
 		}
 	}
-	headerValue = []byte(c.Context().RemoteIP().String())
+	headerValue = str.ToByte(c.ClientIP())
 	if len(headerValue) <= 3 {
 		headerValue = []byte("0.0.0.0")
 	}
