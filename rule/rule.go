@@ -9,7 +9,7 @@ import (
 	"github.com/sujit-baniya/pkg/timeutil"
 )
 
-// Creating rule to work with data of type map[string]interface{}
+// Creating rule to work with data of type map[string]any
 
 type ConditionOperator string
 
@@ -37,11 +37,11 @@ const (
 	EndsWith    ConditionOperator = "ends_with"
 )
 
-type Data map[string]interface{}
+type Data map[string]any
 type Condition struct {
 	Field    string            `json:"field"`
 	Operator ConditionOperator `json:"operator"`
-	Value    interface{}       `json:"value"`
+	Value    any               `json:"value"`
 }
 
 func (condition *Condition) Validate(data Data) bool {
@@ -407,7 +407,15 @@ func (condition *Condition) Validate(data Data) bool {
 	return false
 }
 
-type CallbackFn func(data Data) interface{}
+func NewCondition(field string, operator ConditionOperator, value any) *Condition {
+	return &Condition{
+		Field:    field,
+		Operator: operator,
+		Value:    value,
+	}
+}
+
+type CallbackFn func(data Data) any
 
 type Node struct {
 	Condition []*Condition
@@ -481,9 +489,9 @@ func (r *Rule) Join(left *Group, operator JoinOperator, right *Group) *Join {
 	r.joins = append(r.joins, join)
 	return join
 }
-func (r *Rule) Apply(d Data, callback ...CallbackFn) interface{} {
+func (r *Rule) Apply(d Data, callback ...CallbackFn) any {
 	var result, n, g bool
-	var defaultCallbackFn = func(data Data) interface{} {
+	var defaultCallbackFn = func(data Data) any {
 		if data == nil {
 			return nil
 		}
@@ -613,22 +621,22 @@ func (r *GroupRule) AddRule(rule *Rule, priority int) {
 	})
 }
 
-func (r *GroupRule) ApplyHighestPriority(data Data, fn ...CallbackFn) interface{} {
+func (r *GroupRule) ApplyHighestPriority(data Data, fn ...CallbackFn) any {
 	return r.apply(r.sortByPriority("DESC"), data, fn...)
 }
 
-func (r *GroupRule) ApplyLowestPriority(data Data, fn ...CallbackFn) interface{} {
+func (r *GroupRule) ApplyLowestPriority(data Data, fn ...CallbackFn) any {
 	return r.apply(r.sortByPriority(), data, fn...)
 }
 
-func (r *GroupRule) Apply(data Data, fn ...CallbackFn) interface{} {
+func (r *GroupRule) Apply(data Data, fn ...CallbackFn) any {
 	if r.config.Priority == HighestPriority {
 		return r.ApplyHighestPriority(data, fn...)
 	}
 	return r.ApplyLowestPriority(data, fn...)
 }
 
-func (r *GroupRule) apply(sortedRules []*Rule, data Data, fn ...CallbackFn) interface{} {
+func (r *GroupRule) apply(sortedRules []*Rule, data Data, fn ...CallbackFn) any {
 	for _, rule := range sortedRules {
 		response := rule.Apply(data, fn...)
 		if response != nil {

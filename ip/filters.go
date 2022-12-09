@@ -1,25 +1,28 @@
 package ip
 
 import (
-	"github.com/gofiber/fiber/v2"
-	"verify/utils/ip/geoip"
+	"context"
+	"github.com/sujit-baniya/frame"
+	"github.com/sujit-baniya/frame/pkg/common/utils"
+	"github.com/sujit-baniya/frame/pkg/protocol/consts"
+	"github.com/sujit-baniya/pkg/ip/geoip"
 	"io/ioutil"
 	"log"
 	"net"
 	"sync"
 )
 
-//Config for Filter. Allow supersedes Block for IP checks
-//across all matching subnets, whereas country checks use the
-//latest Allow/Block setting.
-//IPs can be IPv4 or IPv6 and can optionally contain subnet
-//masks (e.g. /24). Note however, determining if a given IP is
-//included in a subnet requires a linear scan so is less performant
-//than looking up single IPs.
+// Config for Filter. Allow supersedes Block for IP checks
+// across all matching subnets, whereas country checks use the
+// latest Allow/Block setting.
+// IPs can be IPv4 or IPv6 and can optionally contain subnet
+// masks (e.g. /24). Note however, determining if a given IP is
+// included in a subnet requires a linear scan so is less performant
+// than looking up single IPs.
 //
-//This could be improved with cidr range prefix tree.
+// This could be improved with cidr range prefix tree.
 type Config struct {
-	ErrorHandler fiber.Handler
+	ErrorHandler frame.HandlerFunc
 	//explicitly allowed IPs
 	AllowedIPs []string
 	//explicitly blocked IPs
@@ -64,8 +67,8 @@ type subnet struct {
 
 var filter = &Filter{}
 
-//NewFilter constructs Filter instance without downloading DB.
-func NewFilter(cfg ...Config) func(c *fiber.Ctx) error {
+// NewFilter constructs Filter instance without downloading DB.
+func NewFilter(cfg ...Config) func(ctx context.Context, c *frame.Context) {
 	var opts Config
 	if len(cfg) > 0 {
 		opts = cfg[0]
@@ -96,21 +99,21 @@ func NewFilter(cfg ...Config) func(c *fiber.Ctx) error {
 		opts.IPContextKey = "ip"
 	}
 	if opts.ErrorHandler == nil {
-		opts.ErrorHandler = func(c *fiber.Ctx) error {
-			return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{
+		opts.ErrorHandler = func(ctx context.Context, c *frame.Context) {
+			c.AbortWithJSON(consts.StatusServiceUnavailable, utils.H{
 				"error":   true,
-				"message": fiber.StatusServiceUnavailable,
+				"message": consts.StatusServiceUnavailable,
 			})
 		}
 	}
-	return func(c *fiber.Ctx) error {
+	return func(ctx context.Context, c *frame.Context) {
 		var remoteIP string
-		rIP := c.Locals(opts.IPContextKey)
+		rIP := c.Value(opts.IPContextKey)
 		if rIP != nil {
 			remoteIP = rIP.(string)
 		} else {
 			remoteIP = geoip.FromRequest(c)
-			c.Locals(opts.IPContextKey, remoteIP)
+			c.Set(opts.IPContextKey, remoteIP)
 		}
 		allowed := filter.Allowed(remoteIP)
 		//special case localhost ipv4
@@ -118,10 +121,11 @@ func NewFilter(cfg ...Config) func(c *fiber.Ctx) error {
 			allowed = true
 		}
 		if !allowed {
-			return opts.ErrorHandler(c)
+			opts.ErrorHandler(ctx, c)
+			return
 		}
 		//success!
-		return c.Next()
+		c.Next(ctx)
 	}
 }
 
@@ -181,7 +185,7 @@ func (f *Filter) BlockCountry(code string) {
 	f.ToggleCountry(code, false)
 }
 
-//ToggleCountry alters a specific country setting
+// ToggleCountry alters a specific country setting
 func (f *Filter) ToggleCountry(code string, allowed bool) {
 
 	f.mut.Lock()
@@ -189,19 +193,19 @@ func (f *Filter) ToggleCountry(code string, allowed bool) {
 	f.mut.Unlock()
 }
 
-//ToggleDefault alters the default setting
+// ToggleDefault alters the default setting
 func (f *Filter) ToggleDefault(allowed bool) {
 	f.mut.Lock()
 	f.defaultAllowed = allowed
 	f.mut.Unlock()
 }
 
-//Allowed returns if a given IP can pass through the filter
+// Allowed returns if a given IP can pass through the filter
 func (f *Filter) Allowed(ipStr string) bool {
 	return f.NetAllowed(net.ParseIP(ipStr))
 }
 
-//NetAllowed returns if a given net.IP can pass through the filter
+// NetAllowed returns if a given net.IP can pass through the filter
 func (f *Filter) NetAllowed(ip net.IP) bool {
 	//invalid ip
 	if ip == nil {
@@ -240,12 +244,12 @@ func (f *Filter) NetAllowed(ip net.IP) bool {
 	return f.defaultAllowed
 }
 
-//Blocked returns if a given IP can NOT pass through the filter
+// Blocked returns if a given IP can NOT pass through the filter
 func (f *Filter) Blocked(ip string) bool {
 	return !f.Allowed(ip)
 }
 
-//NetBlocked returns if a given net.IP can NOT pass through the filter
+// NetBlocked returns if a given net.IP can NOT pass through the filter
 func (f *Filter) NetBlocked(ip net.IP) bool {
 	return !f.NetAllowed(ip)
 }
@@ -278,32 +282,32 @@ func BlockCountry(code string) {
 	filter.BlockCountry(code)
 }
 
-//ToggleCountry alters a specific country setting
+// ToggleCountry alters a specific country setting
 func ToggleCountry(code string, allowed bool) {
 	filter.ToggleCountry(code, allowed)
 }
 
-//ToggleDefault alters the default setting
+// ToggleDefault alters the default setting
 func ToggleDefault(allowed bool) {
 	filter.ToggleDefault(allowed)
 }
 
-//Allowed returns if a given IP can pass through the filter
+// Allowed returns if a given IP can pass through the filter
 func Allowed(ipStr string) bool {
 	return filter.Allowed(ipStr)
 }
 
-//NetAllowed returns if a given net.IP can pass through the filter
+// NetAllowed returns if a given net.IP can pass through the filter
 func NetAllowed(ip net.IP) bool {
 	return filter.NetAllowed(ip)
 }
 
-//Blocked returns if a given IP can NOT pass through the filter
+// Blocked returns if a given IP can NOT pass through the filter
 func Blocked(ip string) bool {
 	return filter.Blocked(ip)
 }
 
-//NetBlocked returns if a given net.IP can NOT pass through the filter
+// NetBlocked returns if a given net.IP can NOT pass through the filter
 func NetBlocked(ip net.IP) bool {
 	return filter.NetBlocked(ip)
 }

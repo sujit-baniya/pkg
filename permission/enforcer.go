@@ -1,6 +1,7 @@
 package permission
 
 import (
+	"github.com/casbin/casbin/v2"
 	"github.com/sujit-baniya/pkg/str"
 )
 
