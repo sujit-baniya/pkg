@@ -4,8 +4,8 @@ import (
 	"sort"
 )
 
-// Simple has complexity: O(n^2)
-func Simple[T comparable](a []T, b []T) []T {
+// SimpleIntersect has complexity: O(n^2)
+func SimpleIntersect[T comparable](a []T, b []T) []T {
 	set := make([]T, 0)
 
 	for _, v := range a {
@@ -35,11 +35,11 @@ func SortedGeneric[T comparable](a []T, b []T) []T {
 
 type Comparator func(i, j int) bool
 
-// Sorted has complexity: O(n + x) where n is length of the shortest array and x duplicate cases in the longest array.
+// SortedIntersect has complexity: O(n + x) where n is length of the shortest array and x duplicate cases in the longest array.
 // Best case complexity: O(n) where n is length of the shortest array (all values unique)
 // Worst case complexity: O(n) where n is length of the longest array (all values of the longest array are duplicates of intersect match)
 // Warning: Function will change left array order
-func Sorted[T comparable](a []T, b []T, leftGreater Comparator) []T {
+func SortedIntersect[T comparable](a []T, b []T, leftGreater Comparator) []T {
 	var i, j, k int
 
 	for {

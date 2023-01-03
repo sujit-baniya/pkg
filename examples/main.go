@@ -14,12 +14,12 @@ var data = `[{"code": "A000", "desc": "Cholera due to Vibrio cholerae 01, biovar
 var data1 = `[{"code": "A000", "desc": "Cholera due to Vibrio cholerae 01, biovar cholerae"}, {"code": "A001", "desc": "Cholera due to Vibrio cholerae 01, biovar eltor"}]`
 
 func main() {
+	// icds := readData(data)
 	icds := readFile()
 	db := fts.New[ICD]()
 	// db.InsertBatchSync(icds)
 	db.InsertBatchAsync(icds)
-	fmt.Println(db.SearchV2("childbirth diabetes insulin controlled"))
-	// db.SearchV2("gestational diabetes")
+	fmt.Println(db.Search("childbirth diabetes controlled"))
 }
 
 type ICD struct {

@@ -227,6 +227,17 @@ func (db *MemDB[Schema]) Insert(doc Schema) (Record[Schema], error) {
 	return Record[Schema]{Id: id, S: doc}, nil
 }
 
+func (db *MemDB[Schema]) IndexLen() int {
+	return db.index.Len()
+}
+
+func (db *MemDB[Schema]) insert(in <-chan Schema, wg *sync.WaitGroup) {
+	defer wg.Done()
+	for d := range in {
+		db.Insert(d)
+	}
+}
+
 func (db *MemDB[Schema]) InsertBatchSync(docs []Schema) []error {
 	errs := make([]error, 0)
 
@@ -238,26 +249,13 @@ func (db *MemDB[Schema]) InsertBatchSync(docs []Schema) []error {
 	return errs
 }
 
-func (db *MemDB[Schema]) IndexLen() int {
-	return db.index.Len()
-}
-
 func (db *MemDB[Schema]) InsertBatchAsync(docs []Schema) []error {
 	in := make(chan Schema)
-	out := make(chan error)
-
 	var wg sync.WaitGroup
-	wg.Add(numCPU)
 
 	for i := 0; i < numCPU; i++ {
-		go func() {
-			defer wg.Done()
-			for d := range in {
-				if _, err := db.Insert(d); err != nil {
-					out <- err
-				}
-			}
-		}()
+		wg.Add(1)
+		go db.insert(in, &wg)
 	}
 	go func() {
 		for _, d := range docs {
@@ -265,17 +263,9 @@ func (db *MemDB[Schema]) InsertBatchAsync(docs []Schema) []error {
 		}
 		close(in)
 	}()
-	go func() {
-		wg.Wait()
-		close(out)
-	}()
+	wg.Wait()
 
-	errs := make([]error, 0)
-	for err := range out {
-		errs = append(errs, err)
-	}
-
-	return errs
+	return nil
 }
 
 func (db *MemDB[Schema]) Update(id string, doc Schema) (Record[Schema], error) {
@@ -315,38 +305,25 @@ func (db *MemDB[Schema]) Delete(id string) error {
 	return nil
 }
 
-func (db *MemDB[Schema]) SearchV2(query string) []Record[Schema] {
-	records := make([]Record[Schema], 0)
-	infos := make([]RecordInfo, 0)
-	tokens := Tokenize(query)
-	for _, token := range tokens {
-		recordsInfos, _ := db.index.Get(token)
-		if len(infos) == 0 {
-			infos = append(infos, recordsInfos...)
-		} else {
-			infos = Simple(infos, recordsInfos)
-		}
-	}
-	for _, info := range infos {
-		doc, _ := db.docs.Get(info.recId)
-		records = append(records, Record[Schema]{Id: info.recId, S: doc})
-	}
-
-	return records
-}
-
 func (db *MemDB[Schema]) Search(query string) []Record[Schema] {
 	records := make([]Record[Schema], 0)
 	infos := make([]RecordInfo, 0)
 	tokens := Tokenize(query)
 	for _, token := range tokens {
 		recordsInfos, _ := db.index.Get(token)
-		for _, info := range recordsInfos {
-			if idx := findRecordInfo(infos, info.recId); idx >= 0 {
-				infos[idx].freq += info.freq
-			} else {
-				infos = append(infos, info)
+		/*
+			for _, info := range recordsInfos {
+				if idx := findRecordInfo(infos, info.recId); idx >= 0 {
+					infos[idx].freq += info.freq
+				} else {
+					infos = append(infos, info)
+				}
 			}
+		*/
+		if len(infos) == 0 {
+			infos = append(infos, recordsInfos...)
+		} else {
+			infos = SimpleIntersect(infos, recordsInfos)
 		}
 	}
 	for _, info := range infos {
