@@ -14,10 +14,14 @@ func main() {
 	start := time.Now()
 	icds := readFile()
 	db := fts.New[ICD]()
-	db.InsertBatchSync(icds)
-	fmt.Println(fmt.Sprintf("Time to index %s", time.Since(start)))
-	fmt.Println(db.Search("childbirth diabetes controlled"))
-	fmt.Println(fmt.Sprintf("Time to search %s", time.Since(start)))
+	db.InsertBatch(icds)
+	fmt.Printf("Time to index %s", time.Since(start))
+	fmt.Println(db.Search("diabetes"))
+	fmt.Printf("Time to search %s", time.Since(start))
+	fmt.Println(db.Search("Escherichia"))
+	fmt.Printf("Time to search %s", time.Since(start))
+	fmt.Println(db.Search("A033"))
+	fmt.Printf("Time to search %s", time.Since(start))
 }
 
 type ICD struct {
@@ -45,10 +49,37 @@ func readFile() (icds []ICD) {
 	return
 }
 
-func readData(data string) (icds []ICD) {
-	if err := json.Unmarshal([]byte(data), &icds); err != nil {
+func readFileAsMap() (icds []map[string]any) {
+	file, err := os.Open("icd10_codes.json")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer file.Close()
+
+	jsonData, err := io.ReadAll(file)
+	if err != nil {
+		fmt.Printf("failed to read json file, error: %v", err)
+		return
+	}
+
+	if err := json.Unmarshal(jsonData, &icds); err != nil {
 		fmt.Printf("failed to unmarshal json file, error: %v", err)
 		return
 	}
 	return
+}
+
+func readFromString() []string {
+	return []string{
+		"Salmonella pneumonia",
+		"Diabetes uncontrolled",
+	}
+}
+
+func readFromInt() []int {
+	return []int{
+		10,
+		100,
+		20,
+	}
 }

@@ -3,14 +3,12 @@ package fts
 import (
 	"fmt"
 	"github.com/goccy/go-reflect"
-	"github.com/google/uuid"
+	"github.com/sujit-baniya/frame/pkg/common/xid"
+	"github.com/sujit-baniya/pkg/str"
 	"regexp"
-	"runtime"
 	"strings"
-	"sync"
+	"time"
 )
-
-var numCPU = runtime.NumCPU()
 
 var punctuationRegex = regexp.MustCompile(`[^\w|\s]`)
 
@@ -206,24 +204,28 @@ type RecordInfo struct {
 type MemDB[Schema SchemaProps] struct {
 	docs  *HashMap[string, Schema]
 	index *HashMap[string, []RecordInfo]
+	rules map[string]bool
 }
 
-func New[Schema SchemaProps]() *MemDB[Schema] {
+func New[Schema SchemaProps](rules ...map[string]bool) *MemDB[Schema] {
+	var r map[string]bool
+	if len(rules) > 0 {
+		r = rules[0]
+	}
 	return &MemDB[Schema]{
 		docs:  NewMap[string, Schema](),
 		index: NewMap[string, []RecordInfo](),
+		rules: r,
 	}
 }
 
 func (db *MemDB[Schema]) Insert(doc Schema) (Record[Schema], error) {
-	id := uuid.NewString()
+	id := xid.New().String()
 	db.docs.Set(id, doc)
-
-	fields := getIndexFields(doc)
+	fields := db.getIndexFields(doc)
 	for _, field := range fields {
 		db.indexField(id, field)
 	}
-
 	return Record[Schema]{Id: id, S: doc}, nil
 }
 
@@ -231,16 +233,8 @@ func (db *MemDB[Schema]) IndexLen() int {
 	return db.index.Len()
 }
 
-func (db *MemDB[Schema]) insert(in <-chan Schema, wg *sync.WaitGroup) {
-	defer wg.Done()
-	for d := range in {
-		db.Insert(d)
-	}
-}
-
-func (db *MemDB[Schema]) InsertBatchSync(docs []Schema) []error {
+func (db *MemDB[Schema]) InsertBatch(docs []Schema) []error {
 	errs := make([]error, 0)
-
 	for _, d := range docs {
 		if _, err := db.Insert(d); err != nil {
 			errs = append(errs, err)
@@ -249,43 +243,20 @@ func (db *MemDB[Schema]) InsertBatchSync(docs []Schema) []error {
 	return errs
 }
 
-func (db *MemDB[Schema]) InsertBatchAsync(docs []Schema) []error {
-	in := make(chan Schema)
-	var wg sync.WaitGroup
-
-	for i := 0; i < numCPU; i++ {
-		wg.Add(1)
-		go db.insert(in, &wg)
-	}
-	go func() {
-		for _, d := range docs {
-			in <- d
-		}
-		close(in)
-	}()
-	wg.Wait()
-
-	return nil
-}
-
 func (db *MemDB[Schema]) Update(id string, doc Schema) (Record[Schema], error) {
 	prevDoc, ok := db.docs.Get(id)
 	if !ok {
 		return Record[Schema]{}, fmt.Errorf("document not found")
 	}
-
 	db.docs.Set(id, doc)
-
-	fields := getIndexFields(prevDoc)
+	fields := db.getIndexFields(prevDoc)
 	for _, field := range fields {
-		db.deindexField(id, field)
+		db.deIndexField(id, field)
 	}
-
-	fields = getIndexFields(doc)
+	fields = db.getIndexFields(doc)
 	for _, field := range fields {
 		db.indexField(id, field)
 	}
-
 	return Record[Schema]{Id: id, S: doc}, nil
 }
 
@@ -294,14 +265,11 @@ func (db *MemDB[Schema]) Delete(id string) error {
 	if !ok {
 		return fmt.Errorf("document not found")
 	}
-
 	db.docs.Del(id)
-
-	fields := getIndexFields(doc)
+	fields := db.getIndexFields(doc)
 	for _, field := range fields {
-		db.deindexField(id, field)
+		db.deIndexField(id, field)
 	}
-
 	return nil
 }
 
@@ -321,14 +289,12 @@ func (db *MemDB[Schema]) Search(query string) []Record[Schema] {
 		doc, _ := db.docs.Get(info.recId)
 		records = append(records, Record[Schema]{Id: info.recId, S: doc})
 	}
-
 	return records
 }
 
 func (db *MemDB[Schema]) indexField(id string, text string) {
 	tokens := Tokenize(text)
 	tokensCount := Count(tokens)
-
 	for token, count := range tokensCount {
 		recordsInfos, _ := db.index.GetOrInsert(token, []RecordInfo{})
 		recordsInfos = append(recordsInfos, RecordInfo{id, count})
@@ -336,14 +302,13 @@ func (db *MemDB[Schema]) indexField(id string, text string) {
 	}
 }
 
-func (db *MemDB[Schema]) deindexField(id string, text string) {
+func (db *MemDB[Schema]) deIndexField(id string, text string) {
 	tokens := Tokenize(text)
-
 	for _, token := range tokens {
 		if recordsInfos, ok := db.index.Get(token); ok {
 			var newRecordsInfos []RecordInfo
 			for _, info := range recordsInfos {
-				if !strings.EqualFold(info.recId, id) {
+				if !str.EqualFold(info.recId, id) {
 					newRecordsInfos = append(newRecordsInfos, info)
 				}
 			}
@@ -352,24 +317,40 @@ func (db *MemDB[Schema]) deindexField(id string, text string) {
 	}
 }
 
-func getIndexFields(obj any) []string {
-	fields := make([]string, 0)
-	val := reflect.ValueOf(obj)
-	t := reflect.TypeOf(obj)
-
-	for i := 0; i < val.NumField(); i++ {
-		f := t.Field(i)
-		if v, ok := f.Tag.Lookup("index"); ok && strings.EqualFold(v, "true") {
-			fields = append(fields, val.Field(i).String())
+func (db *MemDB[Schema]) getIndexFields(obj any) (fields []string) {
+	switch v := obj.(type) {
+	case string, bool, time.Time, int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64:
+		fields = append(fields, fmt.Sprintf("%v", v))
+	case map[string]any:
+		rules := make(map[string]bool)
+		if db.rules != nil {
+			rules = db.rules
+		}
+		for field, val := range v {
+			if len(rules) > 0 {
+				if canIndex, ok := rules[field]; ok && canIndex {
+					fields = append(fields, fmt.Sprintf("%v", val))
+				}
+			} else {
+				fields = append(fields, fmt.Sprintf("%v", val))
+			}
+		}
+	default:
+		val := reflect.ValueOf(obj)
+		t := reflect.TypeOf(obj)
+		for i := 0; i < val.NumField(); i++ {
+			f := t.Field(i)
+			if v, ok := f.Tag.Lookup("index"); ok && str.EqualFold(v, "true") {
+				fields = append(fields, val.Field(i).String())
+			}
 		}
 	}
-
-	return fields
+	return
 }
 
 func findRecordInfo(infos []RecordInfo, id string) int {
 	for idx, info := range infos {
-		if strings.EqualFold(info.recId, id) {
+		if str.EqualFold(info.recId, id) {
 			return idx
 		}
 	}
@@ -378,7 +359,7 @@ func findRecordInfo(infos []RecordInfo, id string) int {
 
 func Tokenize(data string) []string {
 	data = punctuationRegex.ReplaceAllString(data, "")
-	data = strings.ToLower(data)
+	data = str.ToLower(data)
 	arr := strings.Fields(data)
 	noStopWords := removeStopWords(arr)
 	return uniqueSlice(noStopWords)
