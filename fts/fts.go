@@ -217,7 +217,7 @@ func New[Schema SchemaProps]() *MemDB[Schema] {
 
 func (db *MemDB[Schema]) Insert(doc Schema) (Record[Schema], error) {
 	id := uuid.NewString()
-	db.docs.Put(id, doc)
+	db.docs.Set(id, doc)
 
 	fields := getIndexFields(doc)
 	for _, field := range fields {
@@ -274,7 +274,7 @@ func (db *MemDB[Schema]) Update(id string, doc Schema) (Record[Schema], error) {
 		return Record[Schema]{}, fmt.Errorf("document not found")
 	}
 
-	db.docs.Put(id, doc)
+	db.docs.Set(id, doc)
 
 	fields := getIndexFields(prevDoc)
 	for _, field := range fields {
@@ -311,15 +311,6 @@ func (db *MemDB[Schema]) Search(query string) []Record[Schema] {
 	tokens := Tokenize(query)
 	for _, token := range tokens {
 		recordsInfos, _ := db.index.Get(token)
-		/*
-			for _, info := range recordsInfos {
-				if idx := findRecordInfo(infos, info.recId); idx >= 0 {
-					infos[idx].freq += info.freq
-				} else {
-					infos = append(infos, info)
-				}
-			}
-		*/
 		if len(infos) == 0 {
 			infos = append(infos, recordsInfos...)
 		} else {
@@ -341,7 +332,7 @@ func (db *MemDB[Schema]) indexField(id string, text string) {
 	for token, count := range tokensCount {
 		recordsInfos, _ := db.index.GetOrInsert(token, []RecordInfo{})
 		recordsInfos = append(recordsInfos, RecordInfo{id, count})
-		db.index.Put(token, recordsInfos)
+		db.index.Set(token, recordsInfos)
 	}
 }
 
@@ -356,7 +347,7 @@ func (db *MemDB[Schema]) deindexField(id string, text string) {
 					newRecordsInfos = append(newRecordsInfos, info)
 				}
 			}
-			db.index.Put(token, newRecordsInfos)
+			db.index.Set(token, newRecordsInfos)
 		}
 	}
 }
