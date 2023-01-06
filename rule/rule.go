@@ -37,7 +37,7 @@ const (
 	EndsWith    ConditionOperator = "ends_with"
 )
 
-type Data map[string]any
+type Data any
 type Condition struct {
 	Field    string            `json:"field"`
 	Operator ConditionOperator `json:"operator"`
@@ -45,364 +45,367 @@ type Condition struct {
 }
 
 func (condition *Condition) Validate(data Data) bool {
-	val, ok := data[condition.Field]
-	if !ok {
-		return false
-	}
-	switch condition.Operator {
-	case EQ:
-		switch val := val.(type) {
-		case string:
-			switch gtVal := condition.Value.(type) {
-			case string:
-				return strings.EqualFold(val, gtVal)
-			}
-			return false
-		case int:
-			switch gtVal := condition.Value.(type) {
-			case int:
-				return val == gtVal
-			case uint:
-				return val == int(gtVal)
-			case float64:
-				return float64(val) == gtVal
-			}
-			return false
-		case float64:
-			switch gtVal := condition.Value.(type) {
-			case int:
-				return val == float64(gtVal)
-			case uint:
-				return val == float64(gtVal)
-			case float64:
-				return val == gtVal
-			}
+	switch data := data.(type) {
+	case map[string]any:
+		val, ok := data[condition.Field]
+		if !ok {
 			return false
 		}
-	case NEQ:
-		switch val := val.(type) {
-		case string:
-			switch gtVal := condition.Value.(type) {
+		switch condition.Operator {
+		case EQ:
+			switch val := val.(type) {
 			case string:
-				return !strings.EqualFold(val, gtVal)
-			}
-			return false
-		case int:
-			switch gtVal := condition.Value.(type) {
+				switch gtVal := condition.Value.(type) {
+				case string:
+					return strings.EqualFold(val, gtVal)
+				}
+				return false
 			case int:
-				return val != gtVal
+				switch gtVal := condition.Value.(type) {
+				case int:
+					return val == gtVal
+				case uint:
+					return val == int(gtVal)
+				case float64:
+					return float64(val) == gtVal
+				}
+				return false
 			case float64:
-				return float64(val) != gtVal
-			}
-			return false
-		case float64:
-			switch gtVal := condition.Value.(type) {
-			case int:
-				return val != float64(gtVal)
-			case float64:
-				return val != gtVal
-			}
-			return false
-		}
-
-		return false
-	case GT:
-		switch val := data[condition.Field].(type) {
-		case string:
-			from, err := timeutil.ParseTime(val)
-			if err != nil {
+				switch gtVal := condition.Value.(type) {
+				case int:
+					return val == float64(gtVal)
+				case uint:
+					return val == float64(gtVal)
+				case float64:
+					return val == gtVal
+				}
 				return false
 			}
-			switch gtVal := condition.Value.(type) {
+		case NEQ:
+			switch val := val.(type) {
 			case string:
-				smaller, err := timeutil.ParseTime(gtVal)
-				if err != nil {
-					return false
+				switch gtVal := condition.Value.(type) {
+				case string:
+					return !strings.EqualFold(val, gtVal)
 				}
-				return from.After(smaller)
-			}
-			return false
-		case int:
-			switch gtVal := condition.Value.(type) {
+				return false
 			case int:
-				return val > gtVal
+				switch gtVal := condition.Value.(type) {
+				case int:
+					return val != gtVal
+				case float64:
+					return float64(val) != gtVal
+				}
+				return false
 			case float64:
-				return float64(val) > gtVal
-			}
-			return false
-		case float64:
-			switch gtVal := condition.Value.(type) {
-			case int:
-				return val > float64(gtVal)
-			case float64:
-				return val > gtVal
-			}
-			return false
-		}
-
-		return false
-	case LT:
-		switch val := data[condition.Field].(type) {
-		case string:
-			from, err := timeutil.ParseTime(val)
-			if err != nil {
+				switch gtVal := condition.Value.(type) {
+				case int:
+					return val != float64(gtVal)
+				case float64:
+					return val != gtVal
+				}
 				return false
 			}
-			switch gtVal := condition.Value.(type) {
-			case string:
-				smaller, err := timeutil.ParseTime(gtVal)
-				if err != nil {
-					return false
-				}
-				return from.Before(smaller)
-			}
-			return false
-		case int:
-			switch ltVal := condition.Value.(type) {
-			case int:
-				return val < ltVal
-			case uint:
-				return val < int(ltVal)
-			case float64:
-				return float64(val) < ltVal
-			}
-			return false
-		case float64:
-			switch ltVal := condition.Value.(type) {
-			case int:
-				return val < float64(ltVal)
-			case float64:
-				return val < ltVal
-			}
-			return false
-		}
 
-		return false
-	case GTE:
-		switch val := data[condition.Field].(type) {
-		case string:
-			from, err := timeutil.ParseTime(val)
-			if err != nil {
-				return false
-			}
-			switch gtVal := condition.Value.(type) {
+			return false
+		case GT:
+			switch val := data[condition.Field].(type) {
 			case string:
-				smaller, err := timeutil.ParseTime(gtVal)
-				if err != nil {
-					return false
-				}
-				return from.After(smaller) || from.Equal(smaller)
-			}
-			return false
-		case int:
-			switch gtVal := condition.Value.(type) {
-			case int:
-				return val >= gtVal
-			case float64:
-				return float64(val) >= gtVal
-			}
-			return false
-		case float64:
-			switch gtVal := condition.Value.(type) {
-			case int:
-				return val >= float64(gtVal)
-			case float64:
-				return val >= gtVal
-			}
-			return false
-		}
-		return false
-	case LTE:
-		switch val := data[condition.Field].(type) {
-		case string:
-			from, err := timeutil.ParseTime(val)
-			if err != nil {
-				return false
-			}
-			switch gtVal := condition.Value.(type) {
-			case string:
-				smaller, err := timeutil.ParseTime(gtVal)
-				if err != nil {
-					return false
-				}
-				return from.Before(smaller) || from.Equal(smaller)
-			}
-			return false
-		case int:
-			switch ltVal := condition.Value.(type) {
-			case int:
-				return val <= ltVal
-			case float64:
-				return float64(val) <= ltVal
-			}
-			return false
-		case float64:
-			switch ltVal := condition.Value.(type) {
-			case int:
-				return val <= float64(ltVal)
-			case float64:
-				return val <= ltVal
-			}
-			return false
-		}
-
-		return false
-	case BETWEEN:
-		switch val := data[condition.Field].(type) {
-		case string:
-			switch gtVal := condition.Value.(type) {
-			case []string:
 				from, err := timeutil.ParseTime(val)
 				if err != nil {
 					return false
 				}
-				start, err := timeutil.ParseTime(gtVal[0])
+				switch gtVal := condition.Value.(type) {
+				case string:
+					smaller, err := timeutil.ParseTime(gtVal)
+					if err != nil {
+						return false
+					}
+					return from.After(smaller)
+				}
+				return false
+			case int:
+				switch gtVal := condition.Value.(type) {
+				case int:
+					return val > gtVal
+				case float64:
+					return float64(val) > gtVal
+				}
+				return false
+			case float64:
+				switch gtVal := condition.Value.(type) {
+				case int:
+					return val > float64(gtVal)
+				case float64:
+					return val > gtVal
+				}
+				return false
+			}
+
+			return false
+		case LT:
+			switch val := data[condition.Field].(type) {
+			case string:
+				from, err := timeutil.ParseTime(val)
 				if err != nil {
 					return false
 				}
-				last, err := timeutil.ParseTime(gtVal[1])
+				switch gtVal := condition.Value.(type) {
+				case string:
+					smaller, err := timeutil.ParseTime(gtVal)
+					if err != nil {
+						return false
+					}
+					return from.Before(smaller)
+				}
+				return false
+			case int:
+				switch ltVal := condition.Value.(type) {
+				case int:
+					return val < ltVal
+				case uint:
+					return val < int(ltVal)
+				case float64:
+					return float64(val) < ltVal
+				}
+				return false
+			case float64:
+				switch ltVal := condition.Value.(type) {
+				case int:
+					return val < float64(ltVal)
+				case float64:
+					return val < ltVal
+				}
+				return false
+			}
+
+			return false
+		case GTE:
+			switch val := data[condition.Field].(type) {
+			case string:
+				from, err := timeutil.ParseTime(val)
 				if err != nil {
 					return false
 				}
-				return (from.After(start) || from.Equal(start)) && (from.Before(last) || from.Equal(last))
-			}
-			return false
-		case int:
-			switch ltVal := condition.Value.(type) {
-			case []int:
-				return val >= ltVal[0] && val <= ltVal[1]
-			case []float64:
-				return float64(val) >= ltVal[0] && float64(val) <= ltVal[1]
-			}
-			return false
-		case float64:
-			switch ltVal := condition.Value.(type) {
-			case []int:
-				return val >= float64(ltVal[0]) && val <= float64(ltVal[1])
-			case []float64:
-				return val >= ltVal[0] && val <= ltVal[1]
-			}
-			return false
-		}
-
-		return false
-	case IN:
-		switch val := data[condition.Field].(type) {
-		case string:
-			switch gtVal := condition.Value.(type) {
-			case []string:
-				for _, v := range gtVal {
-					if strings.EqualFold(val, v) {
-						return true
+				switch gtVal := condition.Value.(type) {
+				case string:
+					smaller, err := timeutil.ParseTime(gtVal)
+					if err != nil {
+						return false
 					}
+					return from.After(smaller) || from.Equal(smaller)
+				}
+				return false
+			case int:
+				switch gtVal := condition.Value.(type) {
+				case int:
+					return val >= gtVal
+				case float64:
+					return float64(val) >= gtVal
+				}
+				return false
+			case float64:
+				switch gtVal := condition.Value.(type) {
+				case int:
+					return val >= float64(gtVal)
+				case float64:
+					return val >= gtVal
 				}
 				return false
 			}
 			return false
-		case int:
-			switch ltVal := condition.Value.(type) {
-			case []int:
-				for _, v := range ltVal {
-					if val == v {
-						return true
+		case LTE:
+			switch val := data[condition.Field].(type) {
+			case string:
+				from, err := timeutil.ParseTime(val)
+				if err != nil {
+					return false
+				}
+				switch gtVal := condition.Value.(type) {
+				case string:
+					smaller, err := timeutil.ParseTime(gtVal)
+					if err != nil {
+						return false
 					}
+					return from.Before(smaller) || from.Equal(smaller)
+				}
+				return false
+			case int:
+				switch ltVal := condition.Value.(type) {
+				case int:
+					return val <= ltVal
+				case float64:
+					return float64(val) <= ltVal
+				}
+				return false
+			case float64:
+				switch ltVal := condition.Value.(type) {
+				case int:
+					return val <= float64(ltVal)
+				case float64:
+					return val <= ltVal
+				}
+				return false
+			}
+
+			return false
+		case BETWEEN:
+			switch val := data[condition.Field].(type) {
+			case string:
+				switch gtVal := condition.Value.(type) {
+				case []string:
+					from, err := timeutil.ParseTime(val)
+					if err != nil {
+						return false
+					}
+					start, err := timeutil.ParseTime(gtVal[0])
+					if err != nil {
+						return false
+					}
+					last, err := timeutil.ParseTime(gtVal[1])
+					if err != nil {
+						return false
+					}
+					return (from.After(start) || from.Equal(start)) && (from.Before(last) || from.Equal(last))
+				}
+				return false
+			case int:
+				switch ltVal := condition.Value.(type) {
+				case []int:
+					return val >= ltVal[0] && val <= ltVal[1]
+				case []float64:
+					return float64(val) >= ltVal[0] && float64(val) <= ltVal[1]
+				}
+				return false
+			case float64:
+				switch ltVal := condition.Value.(type) {
+				case []int:
+					return val >= float64(ltVal[0]) && val <= float64(ltVal[1])
+				case []float64:
+					return val >= ltVal[0] && val <= ltVal[1]
+				}
+				return false
+			}
+
+			return false
+		case IN:
+			switch val := data[condition.Field].(type) {
+			case string:
+				switch gtVal := condition.Value.(type) {
+				case []string:
+					for _, v := range gtVal {
+						if strings.EqualFold(val, v) {
+							return true
+						}
+					}
+					return false
+				}
+				return false
+			case int:
+				switch ltVal := condition.Value.(type) {
+				case []int:
+					for _, v := range ltVal {
+						if val == v {
+							return true
+						}
+					}
+					return false
+				}
+				return false
+			case float64:
+				switch ltVal := condition.Value.(type) {
+				case []float64:
+					for _, v := range ltVal {
+						if val == v {
+							return true
+						}
+					}
+					return false
+				}
+				return false
+			}
+
+			return false
+		case NotIn:
+			switch val := data[condition.Field].(type) {
+			case string:
+				switch gtVal := condition.Value.(type) {
+				case []string:
+					for _, v := range gtVal {
+						if strings.EqualFold(val, v) {
+							return false
+						}
+					}
+					return true
+				}
+				return false
+			case int:
+				switch ltVal := condition.Value.(type) {
+				case []int:
+					for _, v := range ltVal {
+						if val == v {
+							return false
+						}
+					}
+					return true
+				}
+				return false
+			case float64:
+				switch ltVal := condition.Value.(type) {
+				case []float64:
+					for _, v := range ltVal {
+						if val == v {
+							return false
+						}
+					}
+					return true
+				}
+				return false
+			}
+
+			return false
+		case CONTAINS:
+			switch val := data[condition.Field].(type) {
+			case string:
+				switch gtVal := condition.Value.(type) {
+				case string:
+					return strings.Contains(val, gtVal)
+				}
+				return false
+			}
+
+			return false
+		case NotContains:
+			switch val := data[condition.Field].(type) {
+			case string:
+				switch gtVal := condition.Value.(type) {
+				case string:
+					return !strings.Contains(val, gtVal)
 				}
 				return false
 			}
 			return false
-		case float64:
-			switch ltVal := condition.Value.(type) {
-			case []float64:
-				for _, v := range ltVal {
-					if val == v {
-						return true
-					}
+		case StartsWith:
+			switch val := data[condition.Field].(type) {
+			case string:
+				switch gtVal := condition.Value.(type) {
+				case string:
+					return strings.HasPrefix(val, gtVal)
+				}
+				return false
+			}
+			return false
+		case EndsWith:
+			switch val := data[condition.Field].(type) {
+			case string:
+				switch gtVal := condition.Value.(type) {
+				case string:
+					return strings.HasSuffix(val, gtVal)
 				}
 				return false
 			}
 			return false
 		}
-
-		return false
-	case NotIn:
-		switch val := data[condition.Field].(type) {
-		case string:
-			switch gtVal := condition.Value.(type) {
-			case []string:
-				for _, v := range gtVal {
-					if strings.EqualFold(val, v) {
-						return false
-					}
-				}
-				return true
-			}
-			return false
-		case int:
-			switch ltVal := condition.Value.(type) {
-			case []int:
-				for _, v := range ltVal {
-					if val == v {
-						return false
-					}
-				}
-				return true
-			}
-			return false
-		case float64:
-			switch ltVal := condition.Value.(type) {
-			case []float64:
-				for _, v := range ltVal {
-					if val == v {
-						return false
-					}
-				}
-				return true
-			}
-			return false
-		}
-
-		return false
-	case CONTAINS:
-		switch val := data[condition.Field].(type) {
-		case string:
-			switch gtVal := condition.Value.(type) {
-			case string:
-				return strings.Contains(val, gtVal)
-			}
-			return false
-		}
-
-		return false
-	case NotContains:
-		switch val := data[condition.Field].(type) {
-		case string:
-			switch gtVal := condition.Value.(type) {
-			case string:
-				return !strings.Contains(val, gtVal)
-			}
-			return false
-		}
-		return false
-	case StartsWith:
-		switch val := data[condition.Field].(type) {
-		case string:
-			switch gtVal := condition.Value.(type) {
-			case string:
-				return strings.HasPrefix(val, gtVal)
-			}
-			return false
-		}
-		return false
-	case EndsWith:
-		switch val := data[condition.Field].(type) {
-		case string:
-			switch gtVal := condition.Value.(type) {
-			case string:
-				return strings.HasSuffix(val, gtVal)
-			}
-			return false
-		}
-		return false
 	}
 	return false
 }

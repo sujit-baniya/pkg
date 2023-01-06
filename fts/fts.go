@@ -233,6 +233,10 @@ func (db *MemDB[Schema]) IndexLen() int {
 	return db.index.Len()
 }
 
+func (db *MemDB[Schema]) DocumentLen() int {
+	return db.docs.Len()
+}
+
 func (db *MemDB[Schema]) InsertBatch(docs []Schema) []error {
 	errs := make([]error, 0)
 	for _, d := range docs {
