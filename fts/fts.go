@@ -209,9 +209,9 @@ type Option struct {
 
 type FTS[Schema SchemaProps] struct {
 	key   string
+	rules map[string]bool
 	docs  maps.IMap[string, Schema]
 	index maps.IMap[string, []RecordInfo]
-	rules map[string]bool
 }
 
 var defaultSize = 20
