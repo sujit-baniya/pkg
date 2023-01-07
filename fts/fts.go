@@ -203,42 +203,47 @@ type RecordInfo struct {
 
 type Option struct {
 	Exact bool
+	Size  int
 }
 
-type MemDB[Schema SchemaProps] struct {
+type FTS[Schema SchemaProps] struct {
+	key   string
 	docs  *HashMap[string, Schema]
 	index *HashMap[string, []RecordInfo]
 	rules map[string]bool
 }
 
-func New[Schema SchemaProps](rules ...map[string]bool) *MemDB[Schema] {
+var defaultSize = 20
+
+func New[Schema SchemaProps](key string, rules ...map[string]bool) *FTS[Schema] {
 	var r map[string]bool
 	if len(rules) > 0 {
 		r = rules[0]
 	}
-	return &MemDB[Schema]{
+	return &FTS[Schema]{
+		key:   key,
 		docs:  NewMap[string, Schema](),
 		index: NewMap[string, []RecordInfo](),
 		rules: r,
 	}
 }
 
-func (db *MemDB[Schema]) Insert(doc Schema) (Record[Schema], error) {
+func (db *FTS[Schema]) Insert(doc Schema) (Record[Schema], error) {
 	id := xid.New().String()
 	db.docs.Set(id, doc)
 	db.indexDocument(id, doc)
 	return Record[Schema]{Id: id, S: doc}, nil
 }
 
-func (db *MemDB[Schema]) IndexLen() int {
+func (db *FTS[Schema]) IndexLen() int {
 	return db.index.Len()
 }
 
-func (db *MemDB[Schema]) DocumentLen() int {
+func (db *FTS[Schema]) DocumentLen() int {
 	return db.docs.Len()
 }
 
-func (db *MemDB[Schema]) InsertBatch(docs []Schema) []error {
+func (db *FTS[Schema]) InsertBatch(docs []Schema) []error {
 	errs := make([]error, 0)
 	for _, d := range docs {
 		if _, err := db.Insert(d); err != nil {
@@ -248,7 +253,7 @@ func (db *MemDB[Schema]) InsertBatch(docs []Schema) []error {
 	return errs
 }
 
-func (db *MemDB[Schema]) Update(id string, doc Schema) (Record[Schema], error) {
+func (db *FTS[Schema]) Update(id string, doc Schema) (Record[Schema], error) {
 	prevDoc, ok := db.docs.Get(id)
 	if !ok {
 		return Record[Schema]{}, fmt.Errorf("document not found")
@@ -259,7 +264,7 @@ func (db *MemDB[Schema]) Update(id string, doc Schema) (Record[Schema], error) {
 	return Record[Schema]{Id: id, S: doc}, nil
 }
 
-func (db *MemDB[Schema]) Delete(id string) error {
+func (db *FTS[Schema]) Delete(id string) error {
 	doc, ok := db.docs.Get(id)
 	if !ok {
 		return fmt.Errorf("document not found")
@@ -269,12 +274,11 @@ func (db *MemDB[Schema]) Delete(id string) error {
 	return nil
 }
 
-func (db *MemDB[Schema]) Search(query string, params ...Option) []Record[Schema] {
-	option := Option{Exact: true}
+func (db *FTS[Schema]) Search(query string, params ...Option) []Record[Schema] {
+	option := Option{Size: defaultSize, Exact: true}
 	if len(params) > 0 {
 		option = params[0]
 	}
-
 	recordsIds := make(map[string]int)
 	records := make([]Record[Schema], 0)
 	tokens := Tokenize(query)
@@ -284,17 +288,29 @@ func (db *MemDB[Schema]) Search(query string, params ...Option) []Record[Schema]
 			recordsIds[info.recId] += 1
 		}
 	}
+	i := 0
 	for id, tokensCount := range recordsIds {
 		if !option.Exact || tokensCount == len(tokens) {
-			doc, _ := db.docs.Get(id)
-			records = append(records, Record[Schema]{Id: id, S: doc})
+			if option.Size == 0 || (option.Size > 0 && i < option.Size) {
+				i++
+				doc, _ := db.docs.Get(id)
+				records = append(records, Record[Schema]{Id: id, S: doc})
+			}
 		}
 	}
 
 	return records
 }
 
-func (db *MemDB[Schema]) indexDocument(id string, doc Schema) {
+func (db *FTS[Schema]) SearchExact(query string, size ...int) []Record[Schema] {
+	s := defaultSize
+	if len(size) > 0 {
+		s = size[0]
+	}
+	return db.Search(query, Option{Size: s, Exact: true})
+}
+
+func (db *FTS[Schema]) indexDocument(id string, doc Schema) {
 	text := strings.Join(db.getIndexFields(doc), " ")
 	tokens := Tokenize(text)
 	tokensCount := Count(tokens)
@@ -306,7 +322,7 @@ func (db *MemDB[Schema]) indexDocument(id string, doc Schema) {
 	}
 }
 
-func (db *MemDB[Schema]) deIndexDocument(id string, doc Schema) {
+func (db *FTS[Schema]) deIndexDocument(id string, doc Schema) {
 	text := strings.Join(db.getIndexFields(doc), " ")
 	tokens := Tokenize(text)
 
@@ -323,7 +339,7 @@ func (db *MemDB[Schema]) deIndexDocument(id string, doc Schema) {
 	}
 }
 
-func (db *MemDB[Schema]) getIndexFields(obj any) (fields []string) {
+func (db *FTS[Schema]) getIndexFields(obj any) (fields []string) {
 	switch v := obj.(type) {
 	case string, bool, time.Time, int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64:
 		fields = append(fields, fmt.Sprintf("%v", v))

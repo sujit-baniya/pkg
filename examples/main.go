@@ -13,10 +13,10 @@ import (
 func main() {
 	start := time.Now()
 	icds := readFile()
-	db := fts.New[ICD]()
+	db := fts.New[ICD]("icd")
 	db.InsertBatch(icds)
 	fmt.Printf("Time to index %s", time.Since(start))
-	fmt.Println(db.Search("third trimester pregnancy diabetes"))
+	fmt.Println(db.SearchExact("third trimester pregnancy diabetes"))
 	fmt.Printf("Time to search %s", time.Since(start))
 }
 

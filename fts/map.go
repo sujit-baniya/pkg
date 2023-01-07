@@ -5,18 +5,10 @@ import (
 	"sync"
 )
 
-type SyncMapper[K comparable, V any] interface {
-	Get(key K) (V, bool)
-	Set(key K, value V)
-	Entries() []map[K]V
-}
-
 type HashMap[K comparable, V any] struct {
 	lock sync.RWMutex
 	mp   map[K]V
 }
-
-var _ SyncMapper[int, any] = (*HashMap[int, any])(nil)
 
 func NewMap[K comparable, V any]() *HashMap[K, V] {
 	return &HashMap[K, V]{
