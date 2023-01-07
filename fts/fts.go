@@ -193,8 +193,8 @@ var stopWords = map[string]bool{
 type SchemaProps any
 
 type Record[Schema SchemaProps] struct {
-	Id string
-	S  Schema
+	Id string `json:"id"`
+	S  Schema `json:"data"`
 }
 
 type RecordInfo struct {
