@@ -10,7 +10,7 @@ require (
 	github.com/gorilla/sessions v1.2.1
 	github.com/jinzhu/now v1.1.5
 	github.com/jung-kurt/gofpdf v1.16.2
-	github.com/klauspost/compress v1.15.12
+	github.com/klauspost/compress v1.15.14
 	github.com/klauspost/pgzip v1.2.5
 	github.com/sujit-baniya/frame v0.0.14
 	github.com/sujit-baniya/framework v1.0.25

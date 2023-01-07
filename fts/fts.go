@@ -193,12 +193,12 @@ var stopWords = map[string]bool{
 type SchemaProps any
 
 type Record[Schema SchemaProps] struct {
-	Id string `json:"id"`
+	Id int64  `json:"id"`
 	S  Schema `json:"data"`
 }
 
 type RecordInfo struct {
-	recId string
+	recId int64
 	freq  uint32
 }
 
@@ -210,7 +210,7 @@ type Option struct {
 type FTS[Schema SchemaProps] struct {
 	key   string
 	rules map[string]bool
-	docs  maps.IMap[string, Schema]
+	docs  maps.IMap[int64, Schema]
 	index maps.IMap[string, []RecordInfo]
 }
 
@@ -223,17 +223,17 @@ func New[Schema SchemaProps](key string, rules ...map[string]bool) *FTS[Schema] 
 	}
 	return &FTS[Schema]{
 		key:   key,
-		docs:  maps.New[string, Schema](),
+		docs:  maps.New[int64, Schema](),
 		index: maps.New[string, []RecordInfo](),
 		rules: r,
 	}
 }
 
 func (db *FTS[Schema]) Insert(doc Schema) (Record[Schema], error) {
-	id := xid.New().String()
-	db.docs.Set(id, doc)
-	db.indexDocument(id, doc)
-	return Record[Schema]{Id: id, S: doc}, nil
+	id := xid.New()
+	db.docs.Set(id.Int64(), doc)
+	db.indexDocument(id.Int64(), doc)
+	return Record[Schema]{Id: id.Int64(), S: doc}, nil
 }
 
 func (db *FTS[Schema]) IndexLen() uintptr {
@@ -254,7 +254,7 @@ func (db *FTS[Schema]) InsertBatch(docs []Schema) []error {
 	return errs
 }
 
-func (db *FTS[Schema]) Update(id string, doc Schema) (Record[Schema], error) {
+func (db *FTS[Schema]) Update(id int64, doc Schema) (Record[Schema], error) {
 	prevDoc, ok := db.docs.Get(id)
 	if !ok {
 		return Record[Schema]{}, fmt.Errorf("document not found")
@@ -265,7 +265,7 @@ func (db *FTS[Schema]) Update(id string, doc Schema) (Record[Schema], error) {
 	return Record[Schema]{Id: id, S: doc}, nil
 }
 
-func (db *FTS[Schema]) Delete(id string) error {
+func (db *FTS[Schema]) Delete(id int64) error {
 	doc, ok := db.docs.Get(id)
 	if !ok {
 		return fmt.Errorf("document not found")
@@ -280,7 +280,7 @@ func (db *FTS[Schema]) Search(query string, params ...Option) []Record[Schema] {
 	if len(params) > 0 {
 		option = params[0]
 	}
-	recordsIds := make(map[string]int)
+	recordsIds := make(map[int64]int)
 	records := make([]Record[Schema], 0)
 	tokens := Tokenize(query)
 	for _, token := range tokens {
@@ -311,7 +311,7 @@ func (db *FTS[Schema]) SearchExact(query string, size ...int) []Record[Schema] {
 	return db.Search(query, Option{Size: s, Exact: true})
 }
 
-func (db *FTS[Schema]) indexDocument(id string, doc Schema) {
+func (db *FTS[Schema]) indexDocument(id int64, doc Schema) {
 	text := strings.Join(db.getIndexFields(doc), " ")
 	tokens := Tokenize(text)
 	tokensCount := Count(tokens)
@@ -323,7 +323,7 @@ func (db *FTS[Schema]) indexDocument(id string, doc Schema) {
 	}
 }
 
-func (db *FTS[Schema]) deIndexDocument(id string, doc Schema) {
+func (db *FTS[Schema]) deIndexDocument(id int64, doc Schema) {
 	text := strings.Join(db.getIndexFields(doc), " ")
 	tokens := Tokenize(text)
 
