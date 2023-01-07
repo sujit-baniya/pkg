@@ -222,10 +222,7 @@ func New[Schema SchemaProps](rules ...map[string]bool) *MemDB[Schema] {
 func (db *MemDB[Schema]) Insert(doc Schema) (Record[Schema], error) {
 	id := xid.New().String()
 	db.docs.Set(id, doc)
-	fields := db.getIndexFields(doc)
-	for _, field := range fields {
-		db.indexField(id, field)
-	}
+	db.indexDocument(id, doc)
 	return Record[Schema]{Id: id, S: doc}, nil
 }
 
@@ -252,15 +249,9 @@ func (db *MemDB[Schema]) Update(id string, doc Schema) (Record[Schema], error) {
 	if !ok {
 		return Record[Schema]{}, fmt.Errorf("document not found")
 	}
+	db.deIndexDocument(id, prevDoc)
 	db.docs.Set(id, doc)
-	fields := db.getIndexFields(prevDoc)
-	for _, field := range fields {
-		db.deIndexField(id, field)
-	}
-	fields = db.getIndexFields(doc)
-	for _, field := range fields {
-		db.indexField(id, field)
-	}
+	db.indexDocument(id, doc)
 	return Record[Schema]{Id: id, S: doc}, nil
 }
 
@@ -269,11 +260,8 @@ func (db *MemDB[Schema]) Delete(id string) error {
 	if !ok {
 		return fmt.Errorf("document not found")
 	}
+	db.deIndexDocument(id, doc)
 	db.docs.Del(id)
-	fields := db.getIndexFields(doc)
-	for _, field := range fields {
-		db.deIndexField(id, field)
-	}
 	return nil
 }
 
@@ -296,7 +284,8 @@ func (db *MemDB[Schema]) Search(query string) []Record[Schema] {
 	return records
 }
 
-func (db *MemDB[Schema]) indexField(id string, text string) {
+func (db *MemDB[Schema]) indexDocument(id string, doc Schema) {
+	text := strings.Join(db.getIndexFields(doc), " ")
 	tokens := Tokenize(text)
 	tokensCount := Count(tokens)
 	for token, count := range tokensCount {
@@ -306,7 +295,8 @@ func (db *MemDB[Schema]) indexField(id string, text string) {
 	}
 }
 
-func (db *MemDB[Schema]) deIndexField(id string, text string) {
+func (db *MemDB[Schema]) deIndexDocument(id string, doc Schema) {
+	text := strings.Join(db.getIndexFields(doc), " ")
 	tokens := Tokenize(text)
 	for _, token := range tokens {
 		if recordsInfos, ok := db.index.Get(token); ok {
@@ -350,15 +340,6 @@ func (db *MemDB[Schema]) getIndexFields(obj any) (fields []string) {
 		}
 	}
 	return
-}
-
-func findRecordInfo(infos []RecordInfo, id string) int {
-	for idx, info := range infos {
-		if str.EqualFold(info.recId, id) {
-			return idx
-		}
-	}
-	return -1
 }
 
 func Tokenize(data string) []string {
