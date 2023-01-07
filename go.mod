@@ -14,7 +14,9 @@ require (
 	github.com/klauspost/pgzip v1.2.5
 	github.com/sujit-baniya/frame v0.0.14
 	github.com/sujit-baniya/framework v1.0.25
+	github.com/sujit-baniya/xid v1.2.4
 	golang.org/x/crypto v0.3.0
+	golang.org/x/exp v0.0.0-20230105202349-8879d0199aa3
 	golang.org/x/net v0.2.0
 	golang.org/x/text v0.4.0
 	gorm.io/gorm v1.24.2

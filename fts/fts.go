@@ -3,8 +3,9 @@ package fts
 import (
 	"fmt"
 	"github.com/goccy/go-reflect"
-	"github.com/sujit-baniya/frame/pkg/common/xid"
+	"github.com/sujit-baniya/pkg/maps"
 	"github.com/sujit-baniya/pkg/str"
+	"github.com/sujit-baniya/xid"
 	"regexp"
 	"strings"
 	"time"
@@ -208,8 +209,8 @@ type Option struct {
 
 type FTS[Schema SchemaProps] struct {
 	key   string
-	docs  *HashMap[string, Schema]
-	index *HashMap[string, []RecordInfo]
+	docs  maps.IMap[string, Schema]
+	index maps.IMap[string, []RecordInfo]
 	rules map[string]bool
 }
 
@@ -222,8 +223,8 @@ func New[Schema SchemaProps](key string, rules ...map[string]bool) *FTS[Schema] 
 	}
 	return &FTS[Schema]{
 		key:   key,
-		docs:  NewMap[string, Schema](),
-		index: NewMap[string, []RecordInfo](),
+		docs:  maps.New[string, Schema](),
+		index: maps.New[string, []RecordInfo](),
 		rules: r,
 	}
 }
@@ -235,11 +236,11 @@ func (db *FTS[Schema]) Insert(doc Schema) (Record[Schema], error) {
 	return Record[Schema]{Id: id, S: doc}, nil
 }
 
-func (db *FTS[Schema]) IndexLen() int {
+func (db *FTS[Schema]) IndexLen() uintptr {
 	return db.index.Len()
 }
 
-func (db *FTS[Schema]) DocumentLen() int {
+func (db *FTS[Schema]) DocumentLen() uintptr {
 	return db.docs.Len()
 }
 
@@ -316,7 +317,7 @@ func (db *FTS[Schema]) indexDocument(id string, doc Schema) {
 	tokensCount := Count(tokens)
 
 	for token, count := range tokensCount {
-		recordsInfos, _ := db.index.GetOrInsert(token, []RecordInfo{})
+		recordsInfos, _ := db.index.GetOrSet(token, []RecordInfo{})
 		recordsInfos = append(recordsInfos, RecordInfo{id, count})
 		db.index.Set(token, recordsInfos)
 	}

@@ -218,6 +218,10 @@ github.com/sujit-baniya/frame v0.0.14 h1:1O7jhJemKo98MUVlU5dAd5Aa8BJS1uD1bCuIzKA
 github.com/sujit-baniya/frame v0.0.14/go.mod h1:+TsrjuEsBs5Iwa4Wnz60H/ljTRWMu133QkWzHoJYzcU=
 github.com/sujit-baniya/framework v1.0.25 h1:eTapORaJY0IUit9R56QsKhbf1ZQCeZgf8pSlkCinVkI=
 github.com/sujit-baniya/framework v1.0.25/go.mod h1:aWL3y2p7xFsMa6qnR+UyObereNyX6CaRfGOkqY3yk1s=
+github.com/sujit-baniya/xid v1.2.3 h1:wHsnzn6iBcEgRrHpNQZRMupiA5CXQMRldfJxVNnq8rc=
+github.com/sujit-baniya/xid v1.2.3/go.mod h1:ZttvqxL/+7CcQQ/Mv1HjhjiLdKyZ+9lEXCMsqdpBeT4=
+github.com/sujit-baniya/xid v1.2.4 h1:qSrnwnDYUwV01pwAmpzRwepkxXwavfKA6hjIoU+Kg/4=
+github.com/sujit-baniya/xid v1.2.4/go.mod h1:6dyI6pHzpJuw4lUnHWDXuYFZmEl8KOBbE1I8eQVojhQ=
 github.com/tidwall/gjson v1.9.3/go.mod h1:/wbyibRr2FHMks5tjHJ5F8dMZh3AcwJEMf5vlfC0lxk=
 github.com/tidwall/gjson v1.14.4 h1:uo0p8EbA09J7RQaflQ1aBRffTR7xedD2bcIVSYxLnkM=
 github.com/tidwall/gjson v1.14.4/go.mod h1:/wbyibRr2FHMks5tjHJ5F8dMZh3AcwJEMf5vlfC0lxk=
@@ -258,6 +262,8 @@ golang.org/x/crypto v0.0.0-20220722155217-630584e8d5aa/go.mod h1:IxCIyHEi3zRg3s0
 golang.org/x/crypto v0.0.0-20221005025214-4161e89ecf1b/go.mod h1:IxCIyHEi3zRg3s0A5j5BB6A9Jmi73HwBIUl50j+osU4=
 golang.org/x/crypto v0.3.0 h1:a06MkbcxBrEFc0w0QIZWXrH/9cCX6KJyWbBOIwAn+7A=
 golang.org/x/crypto v0.3.0/go.mod h1:hebNnKkNXi2UzZN1eVRvBB7co0a+JxK6XbPiWVs/3J4=
+golang.org/x/exp v0.0.0-20230105202349-8879d0199aa3 h1:fJwx88sMf5RXwDwziL0/Mn9Wqs+efMSo/RYcL+37W9c=
+golang.org/x/exp v0.0.0-20230105202349-8879d0199aa3/go.mod h1:CxIveKay+FTh1D0yPZemJVgC/95VzuuOLq5Qi4xnoYc=
 golang.org/x/image v0.0.0-20190910094157-69e4b8554b2a/go.mod h1:FeLwcggjj3mMvU+oOTbSwawSJRM1uh48EjtB4UJZlP0=
 golang.org/x/lint v0.0.0-20190930215403-16217165b5de/go.mod h1:6SW0HCj/g11FgYtHlgUYUwCkIfeOF89ocIRzGO/8vkc=
 golang.org/x/mod v0.0.0-20190513183733-4bf6d317e70e/go.mod h1:mXi4GBBbnImb6dmsKGUJ2LatrhH/nqhxcFungHvyanc=
