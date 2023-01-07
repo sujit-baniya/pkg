@@ -16,17 +16,13 @@ func main() {
 	db := fts.New[ICD]()
 	db.InsertBatch(icds)
 	fmt.Printf("Time to index %s", time.Since(start))
-	fmt.Println(db.Search("diabetes"))
-	fmt.Printf("Time to search %s", time.Since(start))
-	fmt.Println(db.Search("Escherichia"))
-	fmt.Printf("Time to search %s", time.Since(start))
-	fmt.Println(db.Search("A033"))
+	fmt.Println(db.Search("third trimester pregnancy diabetes"))
 	fmt.Printf("Time to search %s", time.Since(start))
 }
 
 type ICD struct {
-	Code string `json:"code" index:"true"`
-	Desc string `json:"desc" index:"true"`
+	Code string `json:"code"`
+	Desc string `json:"desc"`
 }
 
 func readFile() (icds []ICD) {

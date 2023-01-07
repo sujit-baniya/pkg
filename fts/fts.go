@@ -201,6 +201,10 @@ type RecordInfo struct {
 	freq  uint32
 }
 
+type Option struct {
+	Exact bool
+}
+
 type MemDB[Schema SchemaProps] struct {
 	docs  *HashMap[string, Schema]
 	index *HashMap[string, []RecordInfo]
@@ -265,22 +269,28 @@ func (db *MemDB[Schema]) Delete(id string) error {
 	return nil
 }
 
-func (db *MemDB[Schema]) Search(query string) []Record[Schema] {
+func (db *MemDB[Schema]) Search(query string, params ...Option) []Record[Schema] {
+	option := Option{Exact: true}
+	if len(params) > 0 {
+		option = params[0]
+	}
+
+	recordsIds := make(map[string]int)
 	records := make([]Record[Schema], 0)
-	infos := make([]RecordInfo, 0)
 	tokens := Tokenize(query)
 	for _, token := range tokens {
-		recordsInfos, _ := db.index.Get(token)
-		if len(infos) == 0 {
-			infos = append(infos, recordsInfos...)
-		} else {
-			infos = SimpleIntersect(infos, recordsInfos)
+		infos, _ := db.index.Get(token)
+		for _, info := range infos {
+			recordsIds[info.recId] += 1
 		}
 	}
-	for _, info := range infos {
-		doc, _ := db.docs.Get(info.recId)
-		records = append(records, Record[Schema]{Id: info.recId, S: doc})
+	for id, tokensCount := range recordsIds {
+		if !option.Exact || tokensCount == len(tokens) {
+			doc, _ := db.docs.Get(id)
+			records = append(records, Record[Schema]{Id: id, S: doc})
+		}
 	}
+
 	return records
 }
 
@@ -288,6 +298,7 @@ func (db *MemDB[Schema]) indexDocument(id string, doc Schema) {
 	text := strings.Join(db.getIndexFields(doc), " ")
 	tokens := Tokenize(text)
 	tokensCount := Count(tokens)
+
 	for token, count := range tokensCount {
 		recordsInfos, _ := db.index.GetOrInsert(token, []RecordInfo{})
 		recordsInfos = append(recordsInfos, RecordInfo{id, count})
@@ -298,11 +309,12 @@ func (db *MemDB[Schema]) indexDocument(id string, doc Schema) {
 func (db *MemDB[Schema]) deIndexDocument(id string, doc Schema) {
 	text := strings.Join(db.getIndexFields(doc), " ")
 	tokens := Tokenize(text)
+
 	for _, token := range tokens {
 		if recordsInfos, ok := db.index.Get(token); ok {
 			var newRecordsInfos []RecordInfo
 			for _, info := range recordsInfos {
-				if !str.EqualFold(info.recId, id) {
+				if info.recId != id {
 					newRecordsInfos = append(newRecordsInfos, info)
 				}
 			}
@@ -332,9 +344,16 @@ func (db *MemDB[Schema]) getIndexFields(obj any) (fields []string) {
 	default:
 		val := reflect.ValueOf(obj)
 		t := reflect.TypeOf(obj)
+		hasIndexField := false
 		for i := 0; i < val.NumField(); i++ {
 			f := t.Field(i)
 			if v, ok := f.Tag.Lookup("index"); ok && str.EqualFold(v, "true") {
+				hasIndexField = true
+				fields = append(fields, val.Field(i).String())
+			}
+		}
+		if !hasIndexField {
+			for i := 0; i < val.NumField(); i++ {
 				fields = append(fields, val.Field(i).String())
 			}
 		}
