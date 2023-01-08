@@ -11,11 +11,10 @@ import (
 )
 
 func main() {
-	start := time.Now()
 	icds := readFile()
 	db := fts.New[ICD]("icd")
-	db.InsertBatch(icds)
-	fmt.Printf("Time to index %s", time.Since(start))
+	db.InsertBatchAsync(icds)
+	start := time.Now()
 	fmt.Println(db.SearchExact("third trimester pregnancy diabetes"))
 	fmt.Printf("Time to search %s", time.Since(start))
 }

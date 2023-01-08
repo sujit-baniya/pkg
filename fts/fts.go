@@ -7,7 +7,9 @@ import (
 	"github.com/sujit-baniya/pkg/str"
 	"github.com/sujit-baniya/xid"
 	"regexp"
+	"runtime"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -199,7 +201,6 @@ type Record[Schema SchemaProps] struct {
 
 type RecordInfo struct {
 	recId int64
-	freq  uint32
 }
 
 type Option struct {
@@ -211,7 +212,7 @@ type FTS[Schema SchemaProps] struct {
 	key   string
 	rules map[string]bool
 	docs  maps.IMap[int64, Schema]
-	index maps.IMap[string, []RecordInfo]
+	index maps.IMap[string, maps.IMap[int64, RecordInfo]]
 }
 
 var defaultSize = 20
@@ -224,7 +225,7 @@ func New[Schema SchemaProps](key string, rules ...map[string]bool) *FTS[Schema] 
 	return &FTS[Schema]{
 		key:   key,
 		docs:  maps.New[int64, Schema](),
-		index: maps.New[string, []RecordInfo](),
+		index: maps.New[string, maps.IMap[int64, RecordInfo]](),
 		rules: r,
 	}
 }
@@ -251,6 +252,43 @@ func (db *FTS[Schema]) InsertBatch(docs []Schema) []error {
 			errs = append(errs, err)
 		}
 	}
+	return errs
+}
+
+func (db *FTS[Schema]) InsertBatchAsync(docs []Schema) []error {
+	in := make(chan Schema)
+	out := make(chan error)
+
+	var wg sync.WaitGroup
+	numCPU := runtime.NumCPU()
+	wg.Add(numCPU)
+
+	for i := 0; i < numCPU; i++ {
+		go func() {
+			defer wg.Done()
+			for d := range in {
+				if _, err := db.Insert(d); err != nil {
+					out <- err
+				}
+			}
+		}()
+	}
+	go func() {
+		for _, d := range docs {
+			in <- d
+		}
+		close(in)
+	}()
+	go func() {
+		wg.Wait()
+		close(out)
+	}()
+
+	errs := make([]error, 0)
+	for err := range out {
+		errs = append(errs, err)
+	}
+
 	return errs
 }
 
@@ -285,9 +323,10 @@ func (db *FTS[Schema]) Search(query string, params ...Option) []Record[Schema] {
 	tokens := Tokenize(query)
 	for _, token := range tokens {
 		infos, _ := db.index.Get(token)
-		for _, info := range infos {
-			recordsIds[info.recId] += 1
-		}
+		infos.ForEach(func(id int64, info RecordInfo) bool {
+			recordsIds[id] += 1
+			return true
+		})
 	}
 	i := 0
 	for id, tokensCount := range recordsIds {
@@ -317,9 +356,8 @@ func (db *FTS[Schema]) indexDocument(id int64, doc Schema) {
 	tokensCount := Count(tokens)
 
 	for token, count := range tokensCount {
-		recordsInfos, _ := db.index.GetOrSet(token, []RecordInfo{})
-		recordsInfos = append(recordsInfos, RecordInfo{id, count})
-		db.index.Set(token, recordsInfos)
+		recordsInfos, _ := db.index.GetOrSet(token, maps.New[int64, RecordInfo]())
+		recordsInfos.Set(id, RecordInfo{count})
 	}
 }
 
@@ -329,13 +367,7 @@ func (db *FTS[Schema]) deIndexDocument(id int64, doc Schema) {
 
 	for _, token := range tokens {
 		if recordsInfos, ok := db.index.Get(token); ok {
-			var newRecordsInfos []RecordInfo
-			for _, info := range recordsInfos {
-				if info.recId != id {
-					newRecordsInfos = append(newRecordsInfos, info)
-				}
-			}
-			db.index.Set(token, newRecordsInfos)
+			recordsInfos.Del(id)
 		}
 	}
 }
@@ -386,8 +418,8 @@ func Tokenize(data string) []string {
 	return uniqueSlice(noStopWords)
 }
 
-func Count(tokens []string) map[string]uint32 {
-	dict := make(map[string]uint32)
+func Count(tokens []string) map[string]int64 {
+	dict := make(map[string]int64)
 	for _, token := range tokens {
 		dict[token]++
 	}
